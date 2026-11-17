@@ -1,0 +1,68 @@
+name: Deploy Rabbit LMS 
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'rabbit/frontend/**'
+      - 'rabbit/backend/**'
+      - 'rabbit/deploy.sh'
+      - '.github/workflows/rabbit-github.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env: 
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  REGISTRY: 926337676555.dkr.ecr.eu-west-2.amazonaws.com
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy Rabbit LMS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Rabbit frontend
+        uses: docker/build-push-action@v6
+        with: 
+          context: ./rabbit/frontend
+          file: ./rabbit/frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/rabbit-frontend:${{ env.IMAGE_TAG }}
+          build-args: |
+            VITE_BACKEND_URL=https://rabbit.apps.devs.surf
+
+      - name: Build and push Rabbit backend
+        uses: docker/build-push-action@v6 
+        with: 
+          context: ./rabbit/backend
+          file: ./rabbit/backend/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/rabbit-backend:${{ env.IMAGE_TAG }}
+
+      - name: Deploy Rabbit LMS to EC2
+        env: 
+          AWS_REGION: ${{ env.AWS_REGION }}
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        run: bash rabbit/deploy.sh
