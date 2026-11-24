@@ -1,14 +1,9 @@
 name: Deploy Rabbit LMS 
 
+# Manual-only: this workflow deploys to an EC2 instance through
+# AWS Systems Manager (SSM). Run it from the Actions tab while that instance
+# is running. Restore the push trigger to auto-deploy again.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'rabbit/frontend/**'
-      - 'rabbit/backend/**'
-      - 'rabbit/deploy.sh'
-      - '.github/workflows/rabbit-github.yml'
   workflow_dispatch:
 
 permissions:
